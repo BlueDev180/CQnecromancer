@@ -3,14 +3,12 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-<title>Bonechain (Prototype v1)</title>
+<title>Bonechain (Portrait v2)</title>
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<div id="rotateGate"><div>Rotate to landscape</div></div>
-
 <header>
-  <div class="build">Bonechain v1</div>
+  <div class="build">Bonechain v2 • Portrait</div>
   <div class="hud">
     <span id="wave">Wave 1</span>
     <span id="hp">HP 50</span>
@@ -20,17 +18,17 @@
 </header>
 
 <main>
-  <canvas id="field" width="960" height="540" aria-label="battlefield"></canvas>
+  <canvas id="field" width="540" height="960" aria-label="battlefield"></canvas>
 </main>
 
 <footer>
-  <div id="blockBar" class="bar" aria-label="skill blocks"></div>
   <div class="legend">
     <span class="b b-SK">💀 SKEL</span>
     <span class="b b-AR">🏹 ARCH</span>
     <span class="b b-WR">👻 WRAITH</span>
     <span class="b b-DB">☠️ BLAST</span>
   </div>
+  <div id="blockBar" class="bar" aria-label="skill blocks"></div>
 </footer>
 
 <script type="module" src="main.js"></script>
