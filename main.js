@@ -1,11 +1,7 @@
-/* Bonechain v2 (Portrait) – Necromancer + CQ-style block chains
-   Portrait flow: enemies spawn at TOP and march DOWN. Your baseline near bottom.
-   Blocks: SK (Skeleton), AR (Archer), WR (Wraith), DB (Death Blast)
-   Combos: tap 1–3 identical adjacent blocks (to the right) to cast/summon.
-*/
+/* Bonechain v3 (Portrait small) – enemies spawn at TOP, march DOWN to your baseline at BOTTOM. */
 
-const W = 540, H = 960;          // canvas logical size (tall)
-const ROWS = 16, COLS = 9;       // grid for AI (taller than wide)
+const W = 405, H = 720;        // smaller canvas
+const ROWS = 18, COLS = 9;     // a bit more vertical granularity
 const cellW = W/COLS, cellH = H/ROWS;
 
 const cvs = document.getElementById('field');
@@ -23,19 +19,19 @@ const game = {
   wave: 1,
   necroHP: 50,
   souls: 0,
-  units: [],     // {team:'ally'|'enemy', x,y, hp,max, atk, rng, cd,tAtk, speed, kind}
-  proj: [],      // {x,y, vx,vy, dmg, team, life}
-  fx: [],        // visuals
-  spawnGate: 0.5, // delay then start first wave
-  volleyT: 0      // archer volley buff timer
+  units: [],
+  proj: [],
+  fx: [],
+  spawnGate: 0.4,
+  volleyT: 0
 };
 
 const TEAMS = {ALLY:'ally', ENEMY:'enemy'};
 
-// ------- Blocks bar -------
+// -------- Blocks ----------
 const TYPES = ['SK','AR','WR','DB'];
 let blocks = [];
-const BAR_SIZE = 12; // two rows of 6
+const BAR_SIZE = 12; // 2 rows of 6
 
 function refillBlocks(){
   while(blocks.length < BAR_SIZE){
@@ -49,17 +45,14 @@ function renderBar(){
   blocks.forEach((k,i)=>{
     const d = document.createElement('div');
     d.className = 'block';
-    d.dataset.i = i;
-    d.dataset.k = k;
+    d.dataset.i = i; d.dataset.k = k;
     d.textContent = symbolFor(k);
     d.style.borderColor = colorFor(k);
     d.onclick = onBlockTap;
     bar.appendChild(d);
   });
 }
-function symbolFor(k){
-  return k==='SK'?'💀':k==='AR'?'🏹':k==='WR'?'👻':'☠️';
-}
+function symbolFor(k){ return k==='SK'?'💀':k==='AR'?'🏹':k==='WR'?'👻':'☠️'; }
 function colorFor(k){
   if (k==='SK') return '#a55';
   if (k==='AR') return '#5a5';
@@ -69,7 +62,6 @@ function colorFor(k){
 function onBlockTap(e){
   const i = +e.currentTarget.dataset.i;
   const k = blocks[i];
-  // count contiguous same blocks to the right (max 3)
   let count = 1;
   if (blocks[i+1]===k) count++;
   if (blocks[i+2]===k) count++;
@@ -79,7 +71,7 @@ function onBlockTap(e){
   cast(k, use);
 }
 
-// ------- Casting / Spells -------
+// -------- Casting ----------
 function cast(k, n){
   if (k==='SK'){
     if (n===1) spawnSquad('Skeleton', 1);
@@ -94,48 +86,47 @@ function cast(k, n){
     if (n===2) spawnSquad('Wraith', 2);
     if (n===3) spawnUnit('WraithElite');
   }else if (k==='DB'){
-    const r = n===1?60:n===2?90:120;
-    const stun = n===3?1.25:0;
-    aoe(W*0.5, H*0.35, r, 10 + n*6, stun); // blast around upper-middle
+    const r = n===1?54:n===2?82:108;
+    const stun = n===3?1.2:0;
+    aoe(W*0.5, H*0.33, r, 10 + n*6, stun);
   }
 }
 
-// ------- Units & Stats -------
+// -------- Units & Stats ----------
 function unit(team, kind, hp, atk, rngCells, cd, speed){
   return {team, kind, x:0, y:0, hp, max:hp, atk, rng:rngCells, cd, tAtk:0, speed};
 }
 function baseUnit(kind){
   switch(kind){
-    case 'Skeleton':    return unit(TEAMS.ALLY,'SK', 22, 6, 1, 0.7, 170);
-    case 'BoneKnight':  return unit(TEAMS.ALLY,'BK', 50,10, 1, 0.9, 150);
-    case 'Archer':      return unit(TEAMS.ALLY,'AR', 16, 7, 4, 1.0, 170);
-    case 'Wraith':      return unit(TEAMS.ALLY,'WR', 14, 9, 1, 0.6, 200);
-    case 'WraithElite': return unit(TEAMS.ALLY,'WE', 26,14, 1, 0.5, 220);
-    case 'Goblin':      return unit(TEAMS.ENEMY,'EG', 16, 5, 1, 0.9, 160);
-    case 'Slinger':     return unit(TEAMS.ENEMY,'ES', 12, 6, 4, 1.05,170);
-    case 'Brute':       return unit(TEAMS.ENEMY,'EB', 36, 9, 1, 1.0, 140);
+    case 'Skeleton':    return unit(TEAMS.ALLY,'SK', 22, 6, 1, 0.7, 160);
+    case 'BoneKnight':  return unit(TEAMS.ALLY,'BK', 48,10, 1, 0.9, 150);
+    case 'Archer':      return unit(TEAMS.ALLY,'AR', 16, 7, 4, 1.0, 165);
+    case 'Wraith':      return unit(TEAMS.ALLY,'WR', 14, 9, 1, 0.6, 190);
+    case 'WraithElite': return unit(TEAMS.ALLY,'WE', 26,14, 1, 0.5, 210);
+    case 'Goblin':      return unit(TEAMS.ENEMY,'EG', 16, 5, 1, 0.9, 155);
+    case 'Slinger':     return unit(TEAMS.ENEMY,'ES', 12, 6, 4, 1.05,165);
+    case 'Brute':       return unit(TEAMS.ENEMY,'EB', 34, 9, 1, 1.0, 135);
   }
-  return unit(TEAMS.ENEMY,'EG', 16, 5, 1, 1, 160);
+  return unit(TEAMS.ENEMY,'EG', 16, 5, 1, 1, 155);
 }
 function spawnUnit(kind){
   const u = baseUnit(kind);
   if (u.team===TEAMS.ALLY){
-    // spawn near bottom third
-    u.x = W*0.25 + Math.random()*W*0.5;
-    u.y = H*0.75 + (Math.random()*cellH - cellH/2);
+    // bottom third spawn band
+    u.x = W*0.22 + Math.random()*W*0.56;
+    u.y = H*0.78 + (Math.random()*cellH - cellH/2);
   }else{
-    // enemies spawn near top region
-    u.x = W*0.2 + Math.random()*W*0.6;
-    u.y = H*0.08 + (Math.random()*cellH*2 - cellH);
+    // TOP band spawn (ensures they march down)
+    u.x = W*0.15 + Math.random()*W*0.7;
+    u.y = H*0.06 + (Math.random()*cellH*1.5 - cellH*0.75);
   }
   game.units.push(u);
 }
 function spawnSquad(kind, n){ for(let i=0;i<n;i++) spawnUnit(kind); }
 
-// ------- Waves -------
+// -------- Waves ----------
 function spawnWave(n){
-  // ramp with variety
-  let g = 4 + Math.floor(n*1.2);
+  let g = 4 + Math.floor(n*1.1);
   let s = Math.floor(n/2);
   let b = Math.floor((n-1)/3);
   for(let i=0;i<g;i++) spawnUnit('Goblin');
@@ -143,7 +134,7 @@ function spawnWave(n){
   for(let i=0;i<b;i++) spawnUnit('Brute');
 }
 
-// ------- AOE -------
+// -------- AOE ----------
 function aoe(xc, yc, r, dmg, stun){
   fxRing(xc,yc,r);
   for(const u of game.units){
@@ -157,7 +148,7 @@ function aoe(xc, yc, r, dmg, stun){
   }
 }
 
-// ------- Targeting helpers -------
+// -------- Helpers ----------
 function nearest(u, team){
   let best=null, bd=1e9;
   for(const v of game.units){
@@ -168,7 +159,8 @@ function nearest(u, team){
   return best;
 }
 function nearestPointTarget(p){
-  let best=null, bd=1e9, want = p.team===TEAMS.ALLY ? TEAMS.ENEMY : TEAMS.ALLY;
+  let want = p.team===TEAMS.ALLY ? TEAMS.ENEMY : TEAMS.ALLY;
+  let best=null, bd=1e9;
   for(const u of game.units){
     if (u.team!==want || u.hp<=0) continue;
     const d = Math.abs(u.x-p.x)+Math.abs(u.y-p.y);
@@ -177,7 +169,7 @@ function nearestPointTarget(p){
   return best;
 }
 
-// ------- Combat -------
+// -------- Combat / Step ----------
 function shoot(u, target, dmg){
   const ang = Math.atan2(target.y-u.y, target.x-u.x);
   game.proj.push({x:u.x, y:u.y, vx:320*Math.cos(ang), vy:320*Math.sin(ang), dmg, team:u.team, life:1.6});
@@ -185,22 +177,19 @@ function shoot(u, target, dmg){
 function step(dt){
   if (!running) return;
 
-  // start wave on gate
   if (game.spawnGate>0){
     game.spawnGate -= dt;
     if (game.spawnGate<=0) spawnWave(game.wave);
   }
   if (game.volleyT>0) game.volleyT = Math.max(0, game.volleyT - dt);
 
-  // AI loop
   for(const u of game.units){
     if (u.hp<=0) continue;
 
     if (u.team===TEAMS.ALLY){
       const e = nearest(u, TEAMS.ENEMY); if (!e) continue;
       const dx = e.x - u.x, dy = e.y - u.y, dist = Math.hypot(dx,dy);
-      const rngPx = u.rng * cellH * 0.9; // range in cell units
-      u.tAtk -= dt;
+      const rngPx = u.rng * cellH * 0.9; u.tAtk -= dt;
 
       if (dist <= rngPx && u.tAtk<=0){
         if (u.rng>1) shoot(u, e, (game.volleyT>0 && u.kind==='AR')? u.atk*1.8 : u.atk);
@@ -208,31 +197,29 @@ function step(dt){
         u.tAtk = u.cd;
       }else{
         const sp = u.speed * dt;
-        // move upward toward enemies (enemies come down)
         u.x += sp * Math.sign(dx) * 0.6;
-        u.y += sp * Math.sign(dy);
+        u.y += sp * Math.sign(dy);  // chase upward a bit then meet in middle
       }
     }else{
-      // enemies prefer to attack allies; else hit necro baseline
+      // enemies head DOWN toward baseline, prefer hitting allies first
       const a = nearest(u, TEAMS.ALLY);
       const tx = a? a.x : W*0.5;
-      const ty = a? a.y : H*0.86; // necro line
+      const ty = a? a.y : H*0.92;  // baseline at bottom
       const dx = tx - u.x, dy = ty - u.y, dist = Math.hypot(dx,dy);
-      const rngPx = u.rng * cellH * 0.9;
-      u.tAtk -= dt;
+      const rngPx = u.rng * cellH * 0.9; u.tAtk -= dt;
 
       if (dist <= rngPx && u.tAtk<=0){
         if (a){
           if (u.rng>1) shoot(u, a, u.atk);
           else { a.hp -= u.atk; fxHit(a.x,a.y); }
         }else{
-          game.necroHP -= u.atk; fxText(W*0.5, H*0.9, '-'+u.atk);
+          game.necroHP -= u.atk; fxText(W*0.5, H*0.95, '-'+u.atk);
         }
         u.tAtk = u.cd;
       }else{
         const sp = u.speed * dt;
-        u.x += sp * Math.sign(dx) * 0.5;
-        u.y += sp * Math.sign(dy); // generally downward
+        u.x += sp * Math.sign(dx) * 0.4;
+        u.y += Math.abs(sp); // bias downward
       }
     }
   }
@@ -248,14 +235,13 @@ function step(dt){
   }
   game.proj = game.proj.filter(p=>!p.dead);
 
-  // death cleanup
+  // cleanup
   for(const u of game.units) if (u.hp<=0) u.dead = true;
   game.units = game.units.filter(u=>!u.dead);
 
-  // win/lose
+  // wave clear / defeat
   const enemiesLeft = game.units.some(u=>u.team===TEAMS.ENEMY);
   if (!enemiesLeft && game.spawnGate<=0){
-    // wave clear
     game.souls += 2 + Math.floor(game.wave/3);
     soulsEl.textContent = `Souls ${game.souls}`;
     fxText(W*0.5, H*0.08, `WAVE ${game.wave} CLEAR!`);
@@ -263,7 +249,6 @@ function step(dt){
     waveEl.textContent = `Wave ${game.wave}`;
     game.spawnGate = 0.8;
 
-    // reward: bonus blocks
     if (Math.random()<0.7) blocks.unshift('SK');
     if (Math.random()<0.5) blocks.unshift('AR');
     while(blocks.length>BAR_SIZE) blocks.pop();
@@ -273,27 +258,24 @@ function step(dt){
     running=false;
     fxText(W*0.5, H*0.5, 'DEFEAT');
   }
-
-  hpEl.textContent = `HP ${Math.max(0, game.necroHP)}`;
+  hpEl.textContent = `HP ${Math.max(0,game.necroHP)}`;
 }
 
-// ------- FX & Render -------
+// -------- FX & Render ----------
 function fxHit(x,y){ game.fx.push({x,y,t:0.15,type:'hit'}); }
 function fxRing(x,y,r){ game.fx.push({x,y,t:0.4, r, type:'ring'}); }
 function fxText(x,y,txt){ game.fx.push({x,y,t:1.0, text:txt, type:'text', yo:0}); }
 
 function draw(){
   ctx.clearRect(0,0,W,H);
-
-  // grid (portrait)
+  // grid
   ctx.strokeStyle = '#1e1e24';
-  ctx.lineWidth = 1;
   for(let r=1;r<ROWS;r++){ ctx.beginPath(); ctx.moveTo(0,r*cellH); ctx.lineTo(W,r*cellH); ctx.stroke(); }
   for(let c=1;c<COLS;c++){ ctx.beginPath(); ctx.moveTo(c*cellW,0); ctx.lineTo(c*cellW,H); ctx.stroke(); }
 
-  // necro baseline near bottom
+  // baseline at bottom
   ctx.fillStyle = '#24242c';
-  ctx.fillRect(W*0.05, H*0.88, W*0.9, 4);
+  ctx.fillRect(W*0.05, H*0.94, W*0.9, 4);
 
   // units
   for(const u of game.units){
@@ -302,34 +284,31 @@ function draw(){
     if (u.kind==='AR') ctx.fillStyle = '#7ed0ff';
     if (u.kind==='WR'||u.kind==='WE') ctx.fillStyle = '#b69aff';
     if (u.kind==='BK') ctx.fillStyle = '#e0c078';
-    ctx.fillRect(u.x-9,u.y-9,18,18);
+    ctx.fillRect(u.x-8,u.y-8,16,16);
 
-    // hp bar
     ctx.fillStyle = '#2a2a2a';
-    ctx.fillRect(u.x-10,u.y+11,20,4);
+    ctx.fillRect(u.x-9,u.y+10,18,3.5);
     ctx.fillStyle = '#7cf470';
-    ctx.fillRect(u.x-10,u.y+11, 20*(u.hp/u.max),4);
+    ctx.fillRect(u.x-9,u.y+10, 18*(u.hp/u.max),3.5);
   }
 
   // projectiles
   ctx.fillStyle = '#fff';
-  for(const p of game.proj){
-    ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill();
-  }
+  for(const p of game.proj){ ctx.beginPath(); ctx.arc(p.x,p.y,2.8,0,Math.PI*2); ctx.fill(); }
 
   // fx
   for(const f of game.fx){
     f.t -= 1/60;
     if (f.type==='hit'){
       ctx.strokeStyle = '#fff8';
-      ctx.strokeRect(f.x-11,f.y-11,22,22);
+      ctx.strokeRect(f.x-10,f.y-10,20,20);
     }else if(f.type==='ring'){
       ctx.strokeStyle = '#ffdd77aa';
       ctx.beginPath(); ctx.arc(f.x,f.y, f.r*(1-f.t/0.4), 0, Math.PI*2); ctx.stroke();
     }else if(f.type==='text'){
       f.yo -= 0.7;
       ctx.fillStyle = '#ffd45a';
-      ctx.font = 'bold 18px system-ui';
+      ctx.font = 'bold 16px system-ui';
       ctx.textAlign='center';
       ctx.fillText(f.text, f.x, f.y + f.yo);
     }
@@ -337,15 +316,14 @@ function draw(){
   game.fx = game.fx.filter(f=>f.t>0);
 }
 
-// ------- Loop & UI -------
+// -------- Loop / UI ----------
 function loop(now){
   const dt = Math.min((now-last)/1000, 1/30); last = now;
-  if (running){ step(dt); }
+  if (running) step(dt);
   draw();
   requestAnimationFrame(loop);
 }
 btnPause.onclick = ()=>{ running = !running; btnPause.textContent = running?'⏸':'▶️'; };
 
-// boot
 refillBlocks();
 requestAnimationFrame(loop);
