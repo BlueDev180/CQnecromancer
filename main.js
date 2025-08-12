@@ -1,8 +1,13 @@
-/* Bonechain v3 (Portrait small) – enemies spawn at TOP, march DOWN to your baseline at BOTTOM. */
+/* Bonechain v3.1 – fixes:
+   - Block chain counts BOTH directions (up to 3).
+   - Enemies hitting baseline deal periodic damage and don’t walk off-screen.
+*/
 
-const W = 405, H = 720;        // smaller canvas
-const ROWS = 18, COLS = 9;     // a bit more vertical granularity
+const W = 405, H = 720;
+const ROWS = 18, COLS = 9;
 const cellW = W/COLS, cellH = H/ROWS;
+const BASE_Y = H * 0.94;     // baseline y
+const BASE_HIT_Y = H * 0.93; // start damaging a tad before line
 
 const cvs = document.getElementById('field');
 const ctx = cvs.getContext('2d');
@@ -31,7 +36,7 @@ const TEAMS = {ALLY:'ally', ENEMY:'enemy'};
 // -------- Blocks ----------
 const TYPES = ['SK','AR','WR','DB'];
 let blocks = [];
-const BAR_SIZE = 12; // 2 rows of 6
+const BAR_SIZE = 12;
 
 function refillBlocks(){
   while(blocks.length < BAR_SIZE){
@@ -62,12 +67,18 @@ function colorFor(k){
 function onBlockTap(e){
   const i = +e.currentTarget.dataset.i;
   const k = blocks[i];
-  let count = 1;
-  if (blocks[i+1]===k) count++;
-  if (blocks[i+2]===k) count++;
-  const use = Math.min(3,count);
-  blocks.splice(i, use);
+
+  // NEW: expand both directions to get the contiguous run (max 3)
+  let start = i, end = i;
+  while (start-1 >= 0 && blocks[start-1] === k) start--;
+  while (end+1 < blocks.length && blocks[end+1] === k) end++;
+  const runLen = end - start + 1;
+  const use = Math.min(3, runLen);
+
+  // remove exactly `use` blocks from the left side of the run so it feels consistent
+  blocks.splice(start, use);
   refillBlocks();
+
   cast(k, use);
 }
 
@@ -112,11 +123,9 @@ function baseUnit(kind){
 function spawnUnit(kind){
   const u = baseUnit(kind);
   if (u.team===TEAMS.ALLY){
-    // bottom third spawn band
     u.x = W*0.22 + Math.random()*W*0.56;
     u.y = H*0.78 + (Math.random()*cellH - cellH/2);
   }else{
-    // TOP band spawn (ensures they march down)
     u.x = W*0.15 + Math.random()*W*0.7;
     u.y = H*0.06 + (Math.random()*cellH*1.5 - cellH*0.75);
   }
@@ -174,6 +183,7 @@ function shoot(u, target, dmg){
   const ang = Math.atan2(target.y-u.y, target.x-u.x);
   game.proj.push({x:u.x, y:u.y, vx:320*Math.cos(ang), vy:320*Math.sin(ang), dmg, team:u.team, life:1.6});
 }
+
 function step(dt){
   if (!running) return;
 
@@ -198,22 +208,27 @@ function step(dt){
       }else{
         const sp = u.speed * dt;
         u.x += sp * Math.sign(dx) * 0.6;
-        u.y += sp * Math.sign(dy);  // chase upward a bit then meet in middle
+        u.y += sp * Math.sign(dy);
       }
     }else{
-      // enemies head DOWN toward baseline, prefer hitting allies first
+      // enemies move DOWN; if allies exist, they fight them first
       const a = nearest(u, TEAMS.ALLY);
-      const tx = a? a.x : W*0.5;
-      const ty = a? a.y : H*0.92;  // baseline at bottom
+      const tx = a? a.x : u.x;
+      const ty = a? a.y : BASE_Y;           // goal is bottom baseline
       const dx = tx - u.x, dy = ty - u.y, dist = Math.hypot(dx,dy);
       const rngPx = u.rng * cellH * 0.9; u.tAtk -= dt;
 
-      if (dist <= rngPx && u.tAtk<=0){
+      // If they reached the base area, pin at baseline and hit base on cooldown
+      if (!a && u.y >= BASE_HIT_Y){
+        u.y = Math.min(u.y, BASE_Y);
+        if (u.tAtk<=0){
+          game.necroHP -= u.atk; fxText(W*0.5, H*0.95, '-'+u.atk);
+          u.tAtk = u.cd;
+        }
+      }else if (dist <= rngPx && u.tAtk<=0){
         if (a){
           if (u.rng>1) shoot(u, a, u.atk);
           else { a.hp -= u.atk; fxHit(a.x,a.y); }
-        }else{
-          game.necroHP -= u.atk; fxText(W*0.5, H*0.95, '-'+u.atk);
         }
         u.tAtk = u.cd;
       }else{
@@ -222,6 +237,10 @@ function step(dt){
         u.y += Math.abs(sp); // bias downward
       }
     }
+
+    // keep everyone inside the field
+    u.x = Math.max(8, Math.min(W-8, u.x));
+    u.y = Math.max(8, Math.min(H-8, u.y));
   }
 
   // projectiles
@@ -236,7 +255,7 @@ function step(dt){
   game.proj = game.proj.filter(p=>!p.dead);
 
   // cleanup
-  for(const u of game.units) if (u.hp<=0) u.dead = true;
+  for(const u of game.units) if (u.hp<=0 || u.y > H+24) u.dead = true; // cull off-screen
   game.units = game.units.filter(u=>!u.dead);
 
   // wave clear / defeat
@@ -273,9 +292,9 @@ function draw(){
   for(let r=1;r<ROWS;r++){ ctx.beginPath(); ctx.moveTo(0,r*cellH); ctx.lineTo(W,r*cellH); ctx.stroke(); }
   for(let c=1;c<COLS;c++){ ctx.beginPath(); ctx.moveTo(c*cellW,0); ctx.lineTo(c*cellW,H); ctx.stroke(); }
 
-  // baseline at bottom
+  // baseline
   ctx.fillStyle = '#24242c';
-  ctx.fillRect(W*0.05, H*0.94, W*0.9, 4);
+  ctx.fillRect(W*0.05, BASE_Y, W*0.9, 4);
 
   // units
   for(const u of game.units){
